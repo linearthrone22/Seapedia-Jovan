@@ -50,9 +50,9 @@ export const advanceTime = async (req: Request, res: Response) => {
 
   try {
     // 1. Shift timestamps back using raw SQL (simulate time passing forward)
-    await prisma.$executeRawUnsafe(`UPDATE "Order" SET "createdAt" = "createdAt" - interval '${days} days', "updatedAt" = "updatedAt" - interval '${days} days'`);
-    await prisma.$executeRawUnsafe(`UPDATE "DeliveryJob" SET "createdAt" = "createdAt" - interval '${days} days', "updatedAt" = "updatedAt" - interval '${days} days'`);
-    await prisma.$executeRawUnsafe(`UPDATE "OrderStatusHistory" SET "createdAt" = "createdAt" - interval '${days} days'`);
+    await prisma.$executeRaw`UPDATE "Order" SET "createdAt" = "createdAt" - (${days} * interval '1 day'), "updatedAt" = "updatedAt" - (${days} * interval '1 day')`;
+    await prisma.$executeRaw`UPDATE "DeliveryJob" SET "createdAt" = "createdAt" - (${days} * interval '1 day'), "updatedAt" = "updatedAt" - (${days} * interval '1 day')`;
+    await prisma.$executeRaw`UPDATE "OrderStatusHistory" SET "createdAt" = "createdAt" - (${days} * interval '1 day')`;
 
     const autoCanceled: string[] = [];
     const autoCompleted: string[] = [];
