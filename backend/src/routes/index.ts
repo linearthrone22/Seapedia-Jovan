@@ -3,6 +3,10 @@ import { register, login, selectRole, logout, me } from '../controllers/auth.con
 import { createReview, getReviews } from '../controllers/review.controller';
 import { createStore, getOwnStore, updateStore, getPublicStore } from '../controllers/store.controller';
 import { createProduct, getSellerProducts, updateProduct, deleteProduct, getPublicProducts, getPublicProductDetail } from '../controllers/product.controller';
+import { getWallet, topupWallet } from '../controllers/wallet.controller';
+import { getAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress } from '../controllers/address.controller';
+import { getCart, addCartItem, updateCartItem, deleteCartItem, clearCart } from '../controllers/cart.controller';
+import { checkout, getBuyerOrders, getBuyerOrderDetail, getSellerOrders, getSellerOrderDetail } from '../controllers/order.controller';
 import { verifyToken, requireRole } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -39,6 +43,33 @@ router.delete('/seller/products/:id', verifyToken, requireRole('SELLER'), delete
 // Product Routes (Public)
 router.get('/products', getPublicProducts);
 router.get('/products/:id', getPublicProductDetail);
+
+// Wallet Routes (Buyer)
+router.get('/buyer/wallet', verifyToken, requireRole('BUYER'), getWallet);
+router.post('/buyer/wallet/topup', verifyToken, requireRole('BUYER'), topupWallet);
+
+// Address Routes (Buyer)
+router.get('/buyer/addresses', verifyToken, requireRole('BUYER'), getAddresses);
+router.post('/buyer/addresses', verifyToken, requireRole('BUYER'), createAddress);
+router.put('/buyer/addresses/:id', verifyToken, requireRole('BUYER'), updateAddress);
+router.delete('/buyer/addresses/:id', verifyToken, requireRole('BUYER'), deleteAddress);
+router.patch('/buyer/addresses/:id/default', verifyToken, requireRole('BUYER'), setDefaultAddress);
+
+// Cart Routes (Buyer)
+router.get('/buyer/cart', verifyToken, requireRole('BUYER'), getCart);
+router.post('/buyer/cart/items', verifyToken, requireRole('BUYER'), addCartItem);
+router.put('/buyer/cart/items/:itemId', verifyToken, requireRole('BUYER'), updateCartItem);
+router.delete('/buyer/cart/items/:itemId', verifyToken, requireRole('BUYER'), deleteCartItem);
+router.delete('/buyer/cart', verifyToken, requireRole('BUYER'), clearCart);
+
+// Checkout & Order Routes (Buyer)
+router.post('/buyer/checkout', verifyToken, requireRole('BUYER'), checkout);
+router.get('/buyer/orders', verifyToken, requireRole('BUYER'), getBuyerOrders);
+router.get('/buyer/orders/:id', verifyToken, requireRole('BUYER'), getBuyerOrderDetail);
+
+// Order Routes (Seller)
+router.get('/seller/orders', verifyToken, requireRole('SELLER'), getSellerOrders);
+router.get('/seller/orders/:id', verifyToken, requireRole('SELLER'), getSellerOrderDetail);
 
 // Health Check
 router.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
