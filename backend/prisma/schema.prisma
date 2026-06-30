@@ -25,6 +25,7 @@ model User {
 
   roles       UserRole[]
   reviews     ApplicationReview[]
+  stores      Store?    @relation("SellerStore")
 }
 
 model UserRole {
@@ -54,4 +55,31 @@ model TokenBlacklist {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model Store {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  sellerId    String    @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  seller      User      @relation("SellerStore", fields: [sellerId], references: [id])
+  products    Product[]
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  stock       Int       @default(0)
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  storeId     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  store       Store     @relation(fields: [storeId], references: [id])
 }

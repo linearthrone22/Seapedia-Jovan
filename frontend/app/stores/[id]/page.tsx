@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Search, ShoppingCart, Eye, Store, Star, ArrowLeft, ArrowRight } from "lucide-react";
+import { Store, ShoppingCart, Eye, Star, ArrowLeft, ArrowRight, Package } from "lucide-react";
 import { getUser } from "@/lib/auth";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -17,16 +16,19 @@ interface Product {
   price: number;
   stock: number;
   imageUrl: string | null;
-  storeId: string;
-  store: {
-    name: string;
-  };
 }
 
-export default function ProductsPage() {
+interface StoreData {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export default function PublicStorePage() {
   const router = useRouter();
+  const params = useParams();
+  const [store, setStore] = useState<StoreData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -38,42 +40,37 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
-  }, [search, page]);
+    fetchStoreData();
+  }, [params.id, page]);
 
-  const fetchProducts = async () => {
+  const fetchStoreData = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/products", {
-        params: { q: search, page, limit: 9 },
+      const res = await api.get(`/stores/${params.id}`, {
+        params: { page, limit: 9 },
       });
+      setStore(res.data.store);
       setProducts(res.data.products);
       setTotalPages(res.data.pagination.pages);
     } catch (err: any) {
-      toast.error("Failed to load products from registry.");
+      toast.error("Failed to load storefront catalog.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-    setPage(1); // Reset page to 1 on new search
-  };
-
   const handleAddToCart = async (productId: string, productName: string) => {
     if (!role) {
-      toast.error("Please login to add items to your cart.");
+      toast.error("Please login to purchase items.");
       router.push("/auth/login");
       return;
     }
     if (role !== "BUYER") {
-      toast.error(`Your active role is ${role}. Only BUYERs can purchase products.`);
+      toast.error(`Your active role is ${role}. Only BUYERs can add products to cart.`);
       return;
     }
 
     try {
-      // Level 3 endpoint integration
       await api.post("/buyer/cart/items", { productId, quantity: 1 });
       toast.success(`Added "${productName}" to cart!`);
     } catch (err: any) {
@@ -89,33 +86,61 @@ export default function ProductsPage() {
     }).format(price);
   };
 
+  if (loading && !store) {
+    return (
+      <div className="flex-grow flex items-center justify-center bg-slate-950">
+        <div className="w-10 h-10 border-t-2 border-teal-400 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!store) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center text-slate-400 flex-grow">
+        Store not found.
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 flex-grow">
-      {/* Header & Search */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold text-white">Market Catalog</h1>
-          <p className="text-slate-400">Discover premium goods, electronics, and accessories.</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 flex-grow w-full">
+      {/* Store Banner */}
+      <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex items-center space-x-4">
+          <div className="w-16 h-16 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-400 border border-teal-500/20 shrink-0">
+            <Store className="h-8 w-8" />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-white">{store.name}</h1>
+            <p className="text-slate-400 text-sm mt-1 max-w-xl">
+              {store.description || "No store description listed."}
+            </p>
+          </div>
         </div>
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-          <Input
-            placeholder="Search products or stores..."
-            value={search}
-            onChange={handleSearchChange}
-            className="pl-9 bg-slate-900 border-white/10 text-white focus:border-teal-500"
-          />
-        </div>
+        <Button
+          variant="outline"
+          onClick={() => router.push("/products")}
+          className="border-white/10 text-slate-300 hover:bg-white/5"
+        >
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> All Products
+        </Button>
       </div>
 
-      {/* Product Grid */}
+      {/* Catalog Title */}
+      <div className="border-b border-white/5 pb-4">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <Package className="h-5 w-5 text-teal-400" /> Catalog Products
+        </h2>
+      </div>
+
+      {/* Store Product Grid */}
       {loading ? (
-        <div className="flex justify-center py-32">
-          <div className="w-10 h-10 border-t-2 border-teal-400 rounded-full animate-spin" />
+        <div className="flex justify-center py-20">
+          <div className="w-8 h-8 border-t-2 border-teal-400 rounded-full animate-spin" />
         </div>
       ) : products.length === 0 ? (
-        <div className="text-center py-20 text-slate-500 border border-white/5 rounded-xl border-dashed">
-          No products matched your search.
+        <div className="text-center py-16 text-slate-500 border border-white/5 border-dashed rounded-xl">
+          This merchant hasn&apos;t listed any items yet.
         </div>
       ) : (
         <div className="space-y-8">
@@ -139,13 +164,6 @@ export default function ProductsPage() {
                 </div>
 
                 <CardHeader className="space-y-1.5 p-5">
-                  <div
-                    onClick={() => router.push(`/stores/${product.storeId}`)}
-                    className="flex items-center text-teal-400 hover:text-teal-300 cursor-pointer text-xs font-semibold space-x-1.5 mb-1 w-fit"
-                  >
-                    <Store className="h-3.5 w-3.5" />
-                    <span>{product.store.name}</span>
-                  </div>
                   <CardTitle className="text-lg text-white font-bold leading-snug line-clamp-1">
                     {product.name}
                   </CardTitle>
