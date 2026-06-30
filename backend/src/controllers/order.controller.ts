@@ -135,6 +135,14 @@ export const processOrder = async (req: Request, res: Response) => {
         },
       });
 
+      await tx.deliveryJob.create({
+        data: {
+          orderId: order.id,
+          deliveryFee: order.deliveryFee,
+          status: 'AVAILABLE',
+        },
+      });
+
       return updatedOrder;
     });
 

@@ -42,6 +42,14 @@ enum DiscountType {
   FIXED
 }
 
+enum DeliveryJobStatus {
+  AVAILABLE
+  ACCEPTED
+  PICKED_UP
+  DELIVERED
+  FAILED
+}
+
 model User {
   id          String    @id @default(cuid())
   username    String    @unique
@@ -58,6 +66,7 @@ model User {
   cart        Cart?     @relation("BuyerCart")
   buyerOrders Order[]   @relation("BuyerOrders")
   sellerOrders Order[]  @relation("SellerOrders")
+  driverJobs  DeliveryJob[] @relation("DriverJobs")
 }
 
 model UserRole {
@@ -200,6 +209,7 @@ model Order {
   statusHistory     OrderStatusHistory[]
   voucher           Voucher?             @relation("OrderVoucher", fields: [voucherId], references: [id])
   promo             Promo?               @relation("OrderPromo", fields: [promoId], references: [id])
+  deliveryJob       DeliveryJob?
 }
 
 model OrderItem {
@@ -246,4 +256,17 @@ model Promo {
   expiresAt      DateTime
   createdAt      DateTime     @default(now())
   orders         Order[]      @relation("OrderPromo")
+}
+
+model DeliveryJob {
+  id          String            @id @default(cuid())
+  orderId     String            @unique
+  driverId    String?
+  status      DeliveryJobStatus @default(AVAILABLE)
+  deliveryFee Float
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  order       Order             @relation(fields: [orderId], references: [id])
+  driver      User?             @relation("DriverJobs", fields: [driverId], references: [id])
 }

@@ -142,7 +142,20 @@ async function main() {
     },
   });
 
-  console.log('Seed complete: admin@seapedia.com / Admin123!, seller1@seapedia.com / Seller123!, vouchers and promos seeded.');
+  // 7. Seed Driver
+  const driverPassword = await bcrypt.hash('Driver123!', 12);
+  await prisma.user.upsert({
+    where: { email: 'driver1@seapedia.com' },
+    update: {},
+    create: {
+      username: 'driver1',
+      email: 'driver1@seapedia.com',
+      password: driverPassword,
+      roles: { create: [{ role: RoleType.DRIVER }] },
+    },
+  });
+
+  console.log('Seed complete: admin@seapedia.com / Admin123!, seller1@seapedia.com / Seller123!, driver1@seapedia.com / Driver123!, discounts seeded.');
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

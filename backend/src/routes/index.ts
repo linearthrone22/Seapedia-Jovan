@@ -8,6 +8,7 @@ import { getAddresses, createAddress, updateAddress, deleteAddress, setDefaultAd
 import { getCart, addCartItem, updateCartItem, deleteCartItem, clearCart } from '../controllers/cart.controller';
 import { checkout, getBuyerOrders, getBuyerOrderDetail, getSellerOrders, getSellerOrderDetail, processOrder, getBuyerReports, getSellerReports } from '../controllers/order.controller';
 import { createVoucher, getVouchers, getVoucherDetail, createPromo, getPromos, getPromoDetail, validateVoucher, validatePromo } from '../controllers/discount.controller';
+import { getAvailableJobs, acceptJob, pickupJob, deliverJob, failJob, getActiveJob, getDriverHistory } from '../controllers/delivery.controller';
 import { verifyToken, requireRole } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -84,6 +85,15 @@ router.get('/admin/vouchers/:id', verifyToken, requireRole('ADMIN'), getVoucherD
 router.post('/admin/promos', verifyToken, requireRole('ADMIN'), createPromo);
 router.get('/admin/promos', verifyToken, requireRole('ADMIN'), getPromos);
 router.get('/admin/promos/:id', verifyToken, requireRole('ADMIN'), getPromoDetail);
+
+// Driver Delivery Routes
+router.get('/driver/jobs/available', verifyToken, requireRole('DRIVER'), getAvailableJobs);
+router.get('/driver/jobs/active', verifyToken, requireRole('DRIVER'), getActiveJob);
+router.get('/driver/history', verifyToken, requireRole('DRIVER'), getDriverHistory);
+router.post('/driver/jobs/:id/accept', verifyToken, requireRole('DRIVER'), acceptJob);
+router.post('/driver/jobs/:id/pickup', verifyToken, requireRole('DRIVER'), pickupJob);
+router.post('/driver/jobs/:id/deliver', verifyToken, requireRole('DRIVER'), deliverJob);
+router.post('/driver/jobs/:id/fail', verifyToken, requireRole('DRIVER'), failJob);
 
 // Reports
 router.get('/buyer/reports', verifyToken, requireRole('BUYER'), getBuyerReports);
