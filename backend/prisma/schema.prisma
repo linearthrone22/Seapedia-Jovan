@@ -7,3 +7,51 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
+enum RoleType {
+  ADMIN
+  SELLER
+  BUYER
+  DRIVER
+}
+
+model User {
+  id          String    @id @default(cuid())
+  username    String    @unique
+  email       String    @unique
+  password    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  roles       UserRole[]
+  reviews     ApplicationReview[]
+}
+
+model UserRole {
+  id        String    @id @default(cuid())
+  userId    String
+  role      RoleType
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+model ApplicationReview {
+  id           String   @id @default(cuid())
+  reviewerName String
+  rating       Int
+  comment      String
+  userId       String?
+  createdAt    DateTime @default(now())
+
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model TokenBlacklist {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
