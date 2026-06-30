@@ -6,7 +6,8 @@ import { createProduct, getSellerProducts, updateProduct, deleteProduct, getPubl
 import { getWallet, topupWallet } from '../controllers/wallet.controller';
 import { getAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress } from '../controllers/address.controller';
 import { getCart, addCartItem, updateCartItem, deleteCartItem, clearCart } from '../controllers/cart.controller';
-import { checkout, getBuyerOrders, getBuyerOrderDetail, getSellerOrders, getSellerOrderDetail } from '../controllers/order.controller';
+import { checkout, getBuyerOrders, getBuyerOrderDetail, getSellerOrders, getSellerOrderDetail, processOrder, getBuyerReports, getSellerReports } from '../controllers/order.controller';
+import { createVoucher, getVouchers, getVoucherDetail, createPromo, getPromos, getPromoDetail, validateVoucher, validatePromo } from '../controllers/discount.controller';
 import { verifyToken, requireRole } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -70,6 +71,23 @@ router.get('/buyer/orders/:id', verifyToken, requireRole('BUYER'), getBuyerOrder
 // Order Routes (Seller)
 router.get('/seller/orders', verifyToken, requireRole('SELLER'), getSellerOrders);
 router.get('/seller/orders/:id', verifyToken, requireRole('SELLER'), getSellerOrderDetail);
+router.patch('/seller/orders/:id/process', verifyToken, requireRole('SELLER'), processOrder);
+
+// Discount Validation (Public / Buyer)
+router.get('/vouchers/validate', validateVoucher);
+router.get('/promos/validate', validatePromo);
+
+// Discount Administration (Admin)
+router.post('/admin/vouchers', verifyToken, requireRole('ADMIN'), createVoucher);
+router.get('/admin/vouchers', verifyToken, requireRole('ADMIN'), getVouchers);
+router.get('/admin/vouchers/:id', verifyToken, requireRole('ADMIN'), getVoucherDetail);
+router.post('/admin/promos', verifyToken, requireRole('ADMIN'), createPromo);
+router.get('/admin/promos', verifyToken, requireRole('ADMIN'), getPromos);
+router.get('/admin/promos/:id', verifyToken, requireRole('ADMIN'), getPromoDetail);
+
+// Reports
+router.get('/buyer/reports', verifyToken, requireRole('BUYER'), getBuyerReports);
+router.get('/seller/reports', verifyToken, requireRole('SELLER'), getSellerReports);
 
 // Health Check
 router.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));

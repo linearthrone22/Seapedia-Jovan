@@ -1,5 +1,5 @@
 import { prisma } from '../utils/prisma';
-import { DeliveryMethod, OrderStatus, TransactionType, Order } from '@prisma/client';
+import { DeliveryMethod, OrderStatus, TransactionType, Order, DiscountType } from '@prisma/client';
 
 export const DELIVERY_FEES: Record<DeliveryMethod, number> = {
   INSTANT: 25000,
@@ -11,12 +11,16 @@ interface CheckoutParams {
   buyerId: string;
   deliveryMethod: DeliveryMethod;
   deliveryAddressId: string;
+  voucherCode?: string;
+  promoCode?: string;
 }
 
 export const executeCheckout = async ({
   buyerId,
   deliveryMethod,
   deliveryAddressId,
+  voucherCode,
+  promoCode,
 }: CheckoutParams): Promise<Order> => {
   return await prisma.$transaction(async (tx) => {
     // 1. Fetch Cart and items
@@ -50,12 +54,84 @@ export const executeCheckout = async ({
     // 3. Compute Subtotal
     const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-    // 4. Compute Discounts (Default to 0 in Level 3)
-    const discountAmount = 0;
+    // 4. Compute Discounts
+    let voucherDiscount = 0;
+    let voucherId: string | null = null;
+    let promoDiscount = 0;
+    let promoId: string | null = null;
+
+    // Apply Voucher First
+    if (voucherCode) {
+      const voucher = await tx.voucher.findUnique({
+        where: { code: voucherCode.toUpperCase().trim() },
+      });
+
+      if (!voucher) {
+        throw new Error('Invalid voucher code.');
+      }
+
+      if (new Date() > voucher.expiresAt) {
+        throw new Error('Voucher has expired.');
+      }
+
+      if (voucher.usedCount >= voucher.maxUsage) {
+        throw new Error('Voucher usage limit has been reached.');
+      }
+
+      if (subtotal < voucher.minOrderAmount) {
+        throw new Error(`Voucher requires a minimum purchase of IDR ${voucher.minOrderAmount}.`);
+      }
+
+      if (voucher.discountType === DiscountType.PERCENTAGE) {
+        voucherDiscount = subtotal * (voucher.discountValue / 100);
+      } else {
+        voucherDiscount = voucher.discountValue;
+      }
+
+      voucherDiscount = Math.min(subtotal, voucherDiscount);
+      voucherId = voucher.id;
+
+      // Increment voucher usage
+      await tx.voucher.update({
+        where: { id: voucher.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
+    // Apply Promo Second on the remainder
+    const remainder = subtotal - voucherDiscount;
+    if (promoCode && remainder > 0) {
+      const promo = await tx.promo.findUnique({
+        where: { code: promoCode.toUpperCase().trim() },
+      });
+
+      if (!promo) {
+        throw new Error('Invalid promo code.');
+      }
+
+      if (new Date() > promo.expiresAt) {
+        throw new Error('Promo has expired.');
+      }
+
+      if (subtotal < promo.minOrderAmount) {
+        throw new Error(`Promo requires a minimum purchase of IDR ${promo.minOrderAmount}.`);
+      }
+
+      if (promo.discountType === DiscountType.PERCENTAGE) {
+        promoDiscount = remainder * (promo.discountValue / 100);
+      } else {
+        promoDiscount = promo.discountValue;
+      }
+
+      promoDiscount = Math.min(remainder, promoDiscount);
+      promoId = promo.id;
+    }
+
+    const totalDiscount = Math.min(subtotal, voucherDiscount + promoDiscount);
 
     // 5. Compute Fees and Taxes
     const deliveryFee = DELIVERY_FEES[deliveryMethod];
-    const taxBase = subtotal - discountAmount + deliveryFee;
+    const taxBase = subtotal - totalDiscount + deliveryFee;
     const taxAmount = Math.round(taxBase * 0.12); // PPN 12%
     const totalAmount = taxBase + taxAmount;
 
@@ -73,7 +149,6 @@ export const executeCheckout = async ({
 
     // 8. Verify Product Stock & Update
     for (const item of cart.items) {
-      // Re-fetch product with transaction lock
       const dbProduct = await tx.product.findUnique({
         where: { id: item.productId },
       });
@@ -83,7 +158,7 @@ export const executeCheckout = async ({
       }
 
       if (dbProduct.stock < item.quantity) {
-        throw new Error(`Insufficient stock for "${dbProduct.name}". Only ${dbProduct.stock} units left, but your cart has ${item.quantity}.`);
+        throw new Error(`Insufficient stock for "${dbProduct.name}". Only ${dbProduct.stock} units left.`);
       }
 
       // Decrement stock
@@ -110,11 +185,13 @@ export const executeCheckout = async ({
         deliveryMethod,
         deliveryAddressId,
         subtotal,
-        discountAmount,
+        discountAmount: totalDiscount,
         deliveryFee,
         taxAmount,
         totalAmount,
         status: OrderStatus.SEDANG_DIKEMAS,
+        voucherId,
+        promoId,
       },
     });
 

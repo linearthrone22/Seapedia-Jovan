@@ -1,9 +1,12 @@
-import { PrismaClient, RoleType } from '@prisma/client';
+import { PrismaClient, RoleType, DiscountType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
   // 1. Seed Admin
   const adminPassword = await bcrypt.hash('Admin123!', 12);
   await prisma.user.upsert({
@@ -40,6 +43,9 @@ async function main() {
       sellerId: seller.id,
     },
   });
+
+  // Cleanup products to avoid duplication on re-seeding
+  await prisma.product.deleteMany({ where: { storeId: store.id } });
 
   // 4. Seed Products for Store
   const productsData = [
@@ -93,7 +99,50 @@ async function main() {
     });
   }
 
-  console.log('Seed complete: admin@seapedia.com / Admin123!, seller1@seapedia.com / Seller123!');
+  // 5. Seed Vouchers
+  await prisma.voucher.upsert({
+    where: { code: 'SAVE10' },
+    update: { expiresAt: oneYearFromNow },
+    create: {
+      code: 'SAVE10',
+      description: 'Dapatkan diskon 10% untuk pesanan minimal IDR 50.000',
+      discountType: DiscountType.PERCENTAGE,
+      discountValue: 10,
+      minOrderAmount: 50000,
+      maxUsage: 100,
+      expiresAt: oneYearFromNow,
+    },
+  });
+
+  await prisma.voucher.upsert({
+    where: { code: 'HEMAT20000' },
+    update: { expiresAt: oneYearFromNow },
+    create: {
+      code: 'HEMAT20000',
+      description: 'Potongan harga langsung IDR 20.000 untuk minimal belanja IDR 100.000',
+      discountType: DiscountType.FIXED,
+      discountValue: 20000,
+      minOrderAmount: 100000,
+      maxUsage: 50,
+      expiresAt: oneYearFromNow,
+    },
+  });
+
+  // 6. Seed Promos
+  await prisma.promo.upsert({
+    where: { code: 'PROMO5' },
+    update: { expiresAt: oneYearFromNow },
+    create: {
+      code: 'PROMO5',
+      description: 'Diskon promo platform 5% tanpa minimal belanja',
+      discountType: DiscountType.PERCENTAGE,
+      discountValue: 5,
+      minOrderAmount: 0,
+      expiresAt: oneYearFromNow,
+    },
+  });
+
+  console.log('Seed complete: admin@seapedia.com / Admin123!, seller1@seapedia.com / Seller123!, vouchers and promos seeded.');
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

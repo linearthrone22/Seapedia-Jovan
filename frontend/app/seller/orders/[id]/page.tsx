@@ -7,7 +7,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, User, MapPin, Truck, RefreshCw } from "lucide-react";
+import { ArrowLeft, Clock, User, MapPin, Truck, RefreshCw, Box } from "lucide-react";
 import { STATUS_BADGES } from "@/app/buyer/orders/page";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -52,6 +52,7 @@ export default function SellerOrderDetailPage() {
   const params = useParams();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     fetchOrderDetail();
@@ -67,6 +68,19 @@ export default function SellerOrderDetailPage() {
       router.push("/seller/orders");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleProcessOrder = async () => {
+    setActionLoading(true);
+    try {
+      await api.patch(`/seller/orders/${params.id}/process`);
+      toast.success("Order processed successfully and queued for driver pickup!");
+      fetchOrderDetail();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to process order.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -188,6 +202,26 @@ export default function SellerOrderDetailPage() {
 
             {/* Right Side: Shipping & Cost info */}
             <div className="md:col-span-1 space-y-6">
+              {/* Order Processing Action */}
+              {order.status === "SEDANG_DIKEMAS" && (
+                <Card className="bg-teal-500/5 border border-teal-500/20 p-6 space-y-4">
+                  <div className="flex items-center gap-2 text-teal-400 font-bold text-sm">
+                    <Box className="h-4.5 w-4.5" />
+                    <span>Action Required</span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    This order is waiting to be processed and packaged. Proceed to queue it for driver pickup.
+                  </p>
+                  <Button
+                    onClick={handleProcessOrder}
+                    disabled={actionLoading}
+                    className="w-full bg-teal-500 hover:bg-teal-600 text-slate-950 font-bold"
+                  >
+                    {actionLoading ? "Processing..." : "Process & Ready to Ship"}
+                  </Button>
+                </Card>
+              )}
+
               {/* Customer Info */}
               <Card className="bg-slate-900/40 border-white/5 p-6 space-y-4">
                 <h3 className="font-bold text-white text-sm flex items-center gap-1.5 border-b border-white/5 pb-2">

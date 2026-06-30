@@ -6,7 +6,8 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Truck, Wallet, AlertCircle, ShoppingBag, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MapPin, Truck, Wallet, AlertCircle, ShoppingBag, Check, Tag } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 
@@ -58,6 +59,14 @@ export default function BuyerCheckoutPage() {
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("REGULAR");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
+  // Discount Codes
+  const [voucherInput, setVoucherInput] = useState("");
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -75,7 +84,6 @@ export default function BuyerCheckoutPage() {
       const walletRes = await api.get("/buyer/wallet");
       setWalletBalance(walletRes.data.balance);
 
-      // Pre-select default address
       const defaultAddr = addrList.find((a: Address) => a.isDefault);
       if (defaultAddr) {
         setSelectedAddressId(defaultAddr.id);
@@ -89,6 +97,46 @@ export default function BuyerCheckoutPage() {
     }
   };
 
+  const handleApplyVoucher = async () => {
+    if (!voucherInput.trim()) return;
+    try {
+      const res = await api.get("/vouchers/validate", {
+        params: { code: voucherInput, subtotal: cart?.subtotal || 0 },
+      });
+      setVoucherDiscount(res.data.calculatedDiscount);
+      setAppliedVoucher(res.data.voucher.code);
+      toast.success(`Voucher "${res.data.voucher.code}" applied: -${formatPrice(res.data.calculatedDiscount)}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Invalid voucher code.");
+    }
+  };
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    // Promo is applied to subtotal minus voucher discount
+    const remainder = (cart?.subtotal || 0) - voucherDiscount;
+    try {
+      const res = await api.get("/promos/validate", {
+        params: { code: promoInput, subtotal: remainder },
+      });
+      setPromoDiscount(res.data.calculatedDiscount);
+      setAppliedPromo(res.data.promo.code);
+      toast.success(`Promo "${res.data.promo.code}" applied: -${formatPrice(res.data.calculatedDiscount)}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Invalid promo code.");
+    }
+  };
+
+  const handleClearDiscounts = () => {
+    setAppliedVoucher(null);
+    setAppliedPromo(null);
+    setVoucherDiscount(0);
+    setPromoDiscount(0);
+    setVoucherInput("");
+    setPromoInput("");
+    toast.success("Discounts cleared.");
+  };
+
   const handleCheckout = async () => {
     if (!selectedAddressId) {
       toast.error("Please select a delivery address.");
@@ -100,6 +148,8 @@ export default function BuyerCheckoutPage() {
       const res = await api.post("/buyer/checkout", {
         deliveryMethod,
         deliveryAddressId: selectedAddressId,
+        voucherCode: appliedVoucher || undefined,
+        promoCode: appliedPromo || undefined,
       });
       toast.success("Order placed successfully!");
       router.push(`/buyer/orders/${res.data.id}`);
@@ -113,8 +163,8 @@ export default function BuyerCheckoutPage() {
   // Calculations
   const subtotal = cart?.subtotal || 0;
   const deliveryFee = SHIPPING_FEES[deliveryMethod];
-  const discountAmount = 0; // stack logic in Level 4
-  const taxBase = subtotal - discountAmount + deliveryFee;
+  const totalDiscount = Math.min(subtotal, voucherDiscount + promoDiscount);
+  const taxBase = subtotal - totalDiscount + deliveryFee;
   const taxAmount = Math.round(taxBase * 0.12);
   const totalAmount = taxBase + taxAmount;
 
@@ -228,11 +278,78 @@ export default function BuyerCheckoutPage() {
                   </div>
                 </div>
 
-                {/* 3. Items Review */}
+                {/* 3. Discount Codes */}
+                <div className="space-y-3 pt-4 border-t border-white/5">
+                  <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                    <Tag className="h-4.5 w-4.5 text-teal-400" />
+                    <span>3. Discount Codes (Vouchers & Promos)</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Voucher Input */}
+                    <Card className="bg-slate-900/40 border-white/5 p-4 space-y-3">
+                      <div className="text-xs font-semibold text-slate-300">Voucher Code</div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g. SAVE10"
+                          value={voucherInput}
+                          onChange={(e) => setVoucherInput(e.target.value)}
+                          disabled={!!appliedVoucher}
+                          className="bg-slate-950 border-white/10 text-white uppercase focus:border-teal-500"
+                        />
+                        {!appliedVoucher ? (
+                          <Button size="sm" onClick={handleApplyVoucher} className="bg-teal-500 hover:bg-teal-600 text-slate-950">
+                            Apply
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" className="border-teal-500/30 text-teal-300" disabled>
+                            Applied
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+
+                    {/* Promo Input */}
+                    <Card className="bg-slate-900/40 border-white/5 p-4 space-y-3">
+                      <div className="text-xs font-semibold text-slate-300">Promo Code</div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g. PROMO5"
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value)}
+                          disabled={!!appliedPromo}
+                          className="bg-slate-950 border-white/10 text-white uppercase focus:border-teal-500"
+                        />
+                        {!appliedPromo ? (
+                          <Button size="sm" onClick={handleApplyPromo} className="bg-teal-500 hover:bg-teal-600 text-slate-950">
+                            Apply
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" className="border-teal-500/30 text-teal-300" disabled>
+                            Applied
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+
+                  {(appliedVoucher || appliedPromo) && (
+                    <div className="flex justify-between items-center bg-teal-500/10 border border-teal-500/20 p-3 rounded-lg text-xs">
+                      <div className="space-y-1">
+                        {appliedVoucher && <div className="text-teal-300">✓ Voucher <strong>{appliedVoucher}</strong> applied (-{formatPrice(voucherDiscount)})</div>}
+                        {appliedPromo && <div className="text-teal-300">✓ Promo <strong>{appliedPromo}</strong> applied (-{formatPrice(promoDiscount)})</div>}
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={handleClearDiscounts} className="text-red-400 hover:bg-red-500/10">
+                        Clear Code
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Items Review */}
                 <div className="space-y-3 pt-4 border-t border-white/5">
                   <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
                     <ShoppingBag className="h-4.5 w-4.5 text-teal-400" />
-                    <span>3. Review Store Items</span>
+                    <span>4. Review Store Items</span>
                   </h3>
                   <Card className="bg-slate-900/40 border-white/5 p-4 divide-y divide-white/5">
                     <div className="pb-2 text-xs text-teal-400 font-semibold">
@@ -241,7 +358,7 @@ export default function BuyerCheckoutPage() {
                     {cart.items.map((item) => (
                       <div key={item.id} className="py-3 flex justify-between text-sm">
                         <div>
-                          <span className="font-semibold text-white">{item.product.name}</span>
+                          <span className="font-semibold text-slate-200">{item.product.name}</span>
                           <span className="text-slate-500 text-xs ml-2">x{item.quantity}</span>
                         </div>
                         <span className="font-semibold text-slate-200">
@@ -266,6 +383,12 @@ export default function BuyerCheckoutPage() {
                       <span>Items Subtotal</span>
                       <span className="font-medium text-slate-200">{formatPrice(subtotal)}</span>
                     </div>
+                    {totalDiscount > 0 && (
+                      <div className="flex justify-between text-teal-400 font-semibold">
+                        <span>Total Discounts</span>
+                        <span>-{formatPrice(totalDiscount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-slate-400">
                       <span>Delivery Fee</span>
                       <span className="font-medium text-slate-200">{formatPrice(deliveryFee)}</span>
