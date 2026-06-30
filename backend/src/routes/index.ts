@@ -9,6 +9,7 @@ import { getCart, addCartItem, updateCartItem, deleteCartItem, clearCart } from 
 import { checkout, getBuyerOrders, getBuyerOrderDetail, getSellerOrders, getSellerOrderDetail, processOrder, getBuyerReports, getSellerReports } from '../controllers/order.controller';
 import { createVoucher, getVouchers, getVoucherDetail, createPromo, getPromos, getPromoDetail, validateVoucher, validatePromo } from '../controllers/discount.controller';
 import { getAvailableJobs, acceptJob, pickupJob, deliverJob, failJob, getActiveJob, getDriverHistory } from '../controllers/delivery.controller';
+import { getAdminStats, advanceTime } from '../controllers/admin.controller';
 import { verifyToken, requireRole } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -94,6 +95,10 @@ router.post('/driver/jobs/:id/accept', verifyToken, requireRole('DRIVER'), accep
 router.post('/driver/jobs/:id/pickup', verifyToken, requireRole('DRIVER'), pickupJob);
 router.post('/driver/jobs/:id/deliver', verifyToken, requireRole('DRIVER'), deliverJob);
 router.post('/driver/jobs/:id/fail', verifyToken, requireRole('DRIVER'), failJob);
+
+// Admin Central Dashboard and Simulation
+router.get('/admin/dashboard/stats', verifyToken, requireRole('ADMIN'), getAdminStats);
+router.post('/admin/time-simulation/advance', verifyToken, requireRole('ADMIN'), advanceTime);
 
 // Reports
 router.get('/buyer/reports', verifyToken, requireRole('BUYER'), getBuyerReports);
